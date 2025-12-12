@@ -1,0 +1,28 @@
+{
+  "customer": {
+    "id": "cust_005",
+    "first_name": "James",
+    "last_name": "Wilson",
+    "email": "james.wilson@example.com",
+    "phone": "(555) 345-6789",
+    "address": {
+      "street": "555 Maple Drive",
+      "city": "Denver",
+      "state": "CO",
+      "zip": "80201"
+    }
+  },
+  "service": {
+    "type": "Rodent Control",
+    "date": "2025-12-08",
+    "technician": "Amanda Brown",
+    "satisfaction_score": 3,
+    "next_service": "2026-01-08",
+    "notes": "Technician arrived 2 hours late. Customer expressed frustration. Service completed but customer seemed unhappy."
+  },
+  "customer_lifetime_value": "medium",
+  "services_count": 4,
+  "referral_eligible": false,
+  "service_issues": "Late arrival, customer dissatisfaction"
+}
+

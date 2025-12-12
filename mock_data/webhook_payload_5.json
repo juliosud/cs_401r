@@ -1,0 +1,27 @@
+{
+  "event_type": "service_completed",
+  "customer": {
+    "id": "CUST-98765",
+    "first_name": "David",
+    "last_name": "Thompson",
+    "email": "david.thompson@example.com",
+    "phone": "+1-555-0654",
+    "address": {
+      "street": "654 Maple Lane",
+      "city": "Fort Worth",
+      "state": "TX",
+      "zip": "76102"
+    }
+  },
+  "service": {
+    "type": "Mosquito Control",
+    "date": "2024-12-07",
+    "technician": "Amanda White",
+    "satisfaction_score": 4,
+    "next_service": "2025-01-07"
+  },
+  "referral_eligible": true,
+  "customer_lifetime_value": "medium",
+  "services_count": 3
+}
+

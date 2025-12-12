@@ -1,0 +1,28 @@
+{
+  "customer": {
+    "id": "cust_004",
+    "first_name": "Emily",
+    "last_name": "Thompson",
+    "email": "emily.thompson@example.com",
+    "phone": "(555) 876-5432",
+    "address": {
+      "street": "321 Pine Road",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701"
+    }
+  },
+  "service": {
+    "type": "General Pest Control",
+    "date": "2025-11-28",
+    "technician": "Robert Kim",
+    "satisfaction_score": 5,
+    "next_service": "2026-02-28",
+    "notes": "Customer very satisfied. Left glowing review online. Mentioned they've been recommending us to neighbors."
+  },
+  "customer_lifetime_value": "very_high",
+  "services_count": 15,
+  "referral_eligible": true,
+  "recent_review": "5-star Google review - 'Best pest control service ever!'"
+}
+

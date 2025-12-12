@@ -1,0 +1,27 @@
+{
+  "event_type": "service_completed",
+  "customer": {
+    "id": "CUST-67890",
+    "first_name": "Sarah",
+    "last_name": "Williams",
+    "email": "sarah.williams@example.com",
+    "phone": "+1-555-0456",
+    "address": {
+      "street": "456 Oak Avenue",
+      "city": "Houston",
+      "state": "TX",
+      "zip": "77002"
+    }
+  },
+  "service": {
+    "type": "Termite Treatment",
+    "date": "2024-12-09",
+    "technician": "David Martinez",
+    "satisfaction_score": 5,
+    "next_service": "2025-06-09"
+  },
+  "referral_eligible": true,
+  "customer_lifetime_value": "high",
+  "services_count": 4
+}
+

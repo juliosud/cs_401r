@@ -1,0 +1,27 @@
+{
+  "event_type": "service_completed",
+  "customer": {
+    "id": "CUST-24680",
+    "first_name": "Michael",
+    "last_name": "Chen",
+    "email": "michael.chen@example.com",
+    "phone": "+1-555-0789",
+    "address": {
+      "street": "789 Elm Drive",
+      "city": "Dallas",
+      "state": "TX",
+      "zip": "75201"
+    }
+  },
+  "service": {
+    "type": "Monthly Pest Control",
+    "date": "2024-12-08",
+    "technician": "Jennifer Lopez",
+    "satisfaction_score": 4,
+    "next_service": "2025-01-08"
+  },
+  "referral_eligible": true,
+  "customer_lifetime_value": "medium",
+  "services_count": 12
+}
+

@@ -1,0 +1,27 @@
+{
+  "event_type": "service_completed",
+  "customer": {
+    "id": "CUST-13579",
+    "first_name": "Emily",
+    "last_name": "Rodriguez",
+    "email": "emily.rodriguez@example.com",
+    "phone": "+1-555-0321",
+    "address": {
+      "street": "321 Pine Street",
+      "city": "San Antonio",
+      "state": "TX",
+      "zip": "78205"
+    }
+  },
+  "service": {
+    "type": "Rodent Control",
+    "date": "2024-12-11",
+    "technician": "Robert Brown",
+    "satisfaction_score": 5,
+    "next_service": "2025-02-11"
+  },
+  "referral_eligible": true,
+  "customer_lifetime_value": "high",
+  "services_count": 6
+}
+

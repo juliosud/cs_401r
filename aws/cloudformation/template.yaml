@@ -1,0 +1,425 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'AWS LLM-Powered Referral Email System'
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Default: 'amazon.nova-pro-v1:0'
+    Description: Bedrock model identifier for LLM (Amazon Nova Pro)
+
+Resources:
+  # S3 Bucket for Brand Guidelines
+  BrandGuidelinesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'referral-brand-guidelines-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # SQS Queue for Message Processing
+  ReferralQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: referral-queue
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ReferralDeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # Dead Letter Queue
+  ReferralDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: referral-dlq
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # DynamoDB Table for Messages
+  ReferralMessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ReferralMessages
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: messageId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+        - AttributeName: customerEmail
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: messageId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: CustomerEmailIndex
+          KeySchema:
+            - AttributeName: customerEmail
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # IAM Role for Webhook Handler Lambda
+  WebhookHandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: referral-webhook-handler-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WebhookHandlerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:GetQueueUrl
+                Resource: !GetAtt ReferralQueue.Arn
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/referral-system/*'
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # IAM Role for Orchestrator Lambda
+  OrchestratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: referral-orchestrator-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: OrchestratorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:ChangeMessageVisibility
+                Resource: !GetAtt ReferralQueue.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt BrandGuidelinesBucket.Arn
+                  - !Sub '${BrandGuidelinesBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:Converse
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt ReferralMessagesTable.Arn
+                  - !Sub '${ReferralMessagesTable.Arn}/index/*'
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/referral-system/*'
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # Webhook Handler Lambda Function
+  WebhookHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: referral-webhook-handler
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../lambda/webhook_handler/
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt WebhookHandlerRole.Arn
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Tags:
+        Project: ReferralEmailSystem
+
+  # Orchestrator Lambda Function
+  OrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: referral-orchestrator
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../lambda/orchestrator/
+      MemorySize: 512
+      Timeout: 300
+      Role: !GetAtt OrchestratorRole.Arn
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+          MODEL_API: CONVERSE
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ReferralQueue.Arn
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 0
+      Tags:
+        Project: ReferralEmailSystem
+
+  # API Gateway REST API
+  ReferralApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: referral-api
+      Description: API for receiving webhook triggers
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # API Gateway Resource
+  WebhookResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ReferralApi
+      ParentId: !GetAtt ReferralApi.RootResourceId
+      PathPart: webhook
+
+  # API Gateway Method
+  WebhookMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ReferralApi
+      ResourceId: !Ref WebhookResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebhookHandlerFunction.Arn}/invocations'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # OPTIONS Method for CORS
+  WebhookOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ReferralApi
+      ResourceId: !Ref WebhookResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - WebhookMethod
+      - WebhookOptionsMethod
+    Properties:
+      RestApiId: !Ref ReferralApi
+      StageName: prod
+
+  # Lambda Permission for API Gateway
+  WebhookHandlerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebhookHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ReferralApi}/*/*'
+
+  # SSM Parameters
+  SQSQueueUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/sqs-queue-url
+      Type: String
+      Value: !Ref ReferralQueue
+      Description: SQS Queue URL for referral system
+      Tags:
+        Project: ReferralEmailSystem
+
+  S3BucketNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/s3-bucket-name
+      Type: String
+      Value: !Ref BrandGuidelinesBucket
+      Description: S3 Bucket name for brand guidelines
+      Tags:
+        Project: ReferralEmailSystem
+
+  BedrockModelIdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/bedrock-model-id
+      Type: String
+      Value: !Ref BedrockModelId
+      Description: Bedrock model ID for LLM
+      Tags:
+        Project: ReferralEmailSystem
+
+  DynamoDBTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/dynamodb-table-name
+      Type: String
+      Value: !Ref ReferralMessagesTable
+      Description: DynamoDB table name for messages
+      Tags:
+        Project: ReferralEmailSystem
+
+  # CloudWatch Log Groups
+  WebhookHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/referral-webhook-handler
+      RetentionInDays: 7
+
+  OrchestratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/referral-orchestrator
+      RetentionInDays: 7
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ReferralApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    Export:
+      Name: ReferralApiEndpoint
+
+  WebhookUrl:
+    Description: Webhook endpoint URL
+    Value: !Sub 'https://${ReferralApi}.execute-api.${AWS::Region}.amazonaws.com/prod/webhook'
+    Export:
+      Name: ReferralWebhookUrl
+
+  BrandGuidelinesBucket:
+    Description: S3 bucket name for brand guidelines
+    Value: !Ref BrandGuidelinesBucket
+    Export:
+      Name: ReferralBrandGuidelinesBucket
+
+  ReferralQueueUrl:
+    Description: SQS queue URL
+    Value: !Ref ReferralQueue
+    Export:
+      Name: ReferralQueueUrl
+
+  DeadLetterQueueUrl:
+    Description: Dead letter queue URL
+    Value: !Ref ReferralDeadLetterQueue
+    Export:
+      Name: ReferralDeadLetterQueueUrl
+
+  DynamoDBTableName:
+    Description: DynamoDB table name
+    Value: !Ref ReferralMessagesTable
+    Export:
+      Name: ReferralDynamoDBTable
+
+  WebhookHandlerFunctionArn:
+    Description: Webhook handler Lambda ARN
+    Value: !GetAtt WebhookHandlerFunction.Arn
+    Export:
+      Name: WebhookHandlerFunctionArn
+
+  OrchestratorFunctionArn:
+    Description: Orchestrator Lambda ARN
+    Value: !GetAtt OrchestratorFunction.Arn
+    Export:
+      Name: OrchestratorFunctionArn
+

@@ -1,0 +1,29 @@
+{
+  "customer": {
+    "id": "cust_003",
+    "first_name": "Michael",
+    "last_name": "Rodriguez",
+    "email": "michael.rodriguez@example.com",
+    "phone": "(555) 234-5678",
+    "address": {
+      "street": "789 Oak Avenue",
+      "city": "Seattle",
+      "state": "WA",
+      "zip": "98101"
+    }
+  },
+  "service": {
+    "type": "Ant Control",
+    "date": "2025-12-05",
+    "technician": "Lisa Martinez",
+    "satisfaction_score": 3,
+    "next_service": "Not scheduled",
+    "notes": "Customer filed complaint about chemicals affecting their pets. Requested refund."
+  },
+  "customer_lifetime_value": "medium",
+  "services_count": 3,
+  "referral_eligible": false,
+  "recent_complaint": "Unhappy with service - pets became ill after treatment",
+  "complaint_date": "2025-12-06"
+}
+

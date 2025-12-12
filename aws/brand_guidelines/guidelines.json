@@ -1,0 +1,94 @@
+{
+  "company_name": "Guardian Pest Control",
+  "brand_voice": {
+    "tone": "Professional, friendly, and reassuring",
+    "personality": "Expert advisor who cares about customer safety and home protection",
+    "style": "Conversational yet authoritative, approachable but not casual"
+  },
+  "key_messages": [
+    "Year-round protection for your home and family",
+    "Licensed experts with 15+ years of experience",
+    "Eco-friendly and pet-safe treatment options",
+    "Guaranteed results with free re-treatments",
+    "Proactive prevention is better than reactive treatment"
+  ],
+  "writing_guidelines": {
+  "formatting": [
+      "Short paragraphs (2-3 sentences max)",
+      "Bullet points for benefits or features",
+      "Clear call-to-action at the end",
+      "Use customer's first name naturally"
+  ],
+  "avoid": [
+      "Scare tactics or fear-mongering",
+      "Overly technical jargon",
+      "Pushy sales language",
+      "Discounting competitor services",
+      "Making unrealistic promises"
+    ]
+  },
+  "service_catalog": {
+    "preventive_services": [
+      {
+        "name": "Quarterly Protection Plan",
+        "description": "Year-round pest prevention with treatments every 3 months",
+        "ideal_for": "Homeowners wanting consistent protection",
+        "upsell_triggers": ["currently on one-time service", "experiencing recurring issues", "services_count < 4"],
+        "benefits": ["Save 20% vs one-time treatments", "Priority scheduling", "Free re-treatments between visits"]
+      },
+      {
+        "name": "Monthly Guard Service",
+        "description": "Premium monthly inspections and treatments for maximum protection",
+        "ideal_for": "Properties in high-pest areas or with previous infestations",
+        "upsell_triggers": ["quarterly plan with recurring issues", "high-risk location", "previous major infestation"],
+        "benefits": ["Most comprehensive coverage", "Same-day emergency response", "30% savings annually"]
+      }
+    ],
+    "specialized_treatments": [
+      {
+        "name": "Termite Protection Program",
+        "description": "Comprehensive termite inspection, treatment, and annual monitoring",
+        "ideal_for": "Homeowners concerned about structural damage",
+        "upsell_triggers": ["general pest control only", "property age > 10 years", "wood construction", "nearby termite activity"],
+        "benefits": ["Protects home value", "Transferable warranty", "Annual inspections included"]
+      },
+      {
+        "name": "Rodent Exclusion & Control",
+        "description": "Complete rodent removal plus entry point sealing",
+        "ideal_for": "Properties with rodent issues or risk factors",
+        "upsell_triggers": ["rodent sightings", "attic/crawlspace access", "older homes"],
+        "benefits": ["Permanent solution", "Prevents health hazards", "One-time comprehensive service"]
+      },
+      {
+        "name": "Mosquito Barrier Treatment",
+        "description": "Outdoor perimeter treatment reducing mosquitoes by 90%",
+        "ideal_for": "Families with outdoor living spaces",
+        "upsell_triggers": ["spring/summer season", "has yard/patio", "children or frequent outdoor use"],
+        "benefits": ["Enjoy your yard again", "Monthly treatments April-October", "Safe for kids and pets"]
+      },
+      {
+        "name": "Wildlife Removal & Prevention",
+        "description": "Humane removal of raccoons, squirrels, bats, and prevention services",
+        "ideal_for": "Properties with attics, sheds, or wildlife activity",
+        "upsell_triggers": ["noises in attic", "wildlife sightings", "structural damage signs"],
+        "benefits": ["Humane removal methods", "Damage repair included", "Prevention guaranteed"]
+      }
+    ],
+    "add_on_services": [
+      {
+        "name": "Attic Insulation Inspection",
+        "description": "Free inspection for pest damage and insulation efficiency",
+        "ideal_for": "Homeowners with attic access",
+        "upsell_triggers": ["termite service", "rodent service", "energy concerns"],
+        "benefits": ["Identify hidden pest damage", "Improve energy efficiency", "Complimentary with treatment"]
+      },
+      {
+        "name": "Smart Monitoring System",
+        "description": "24/7 digital monitoring with real-time pest activity alerts",
+        "ideal_for": "Tech-savvy homeowners or rental properties",
+        "upsell_triggers": ["recurring issues", "property manager", "high-value home"],
+        "benefits": ["Real-time alerts to phone", "Proactive prevention", "Detailed activity reports"]
+      }
+    ]
+  }
+}

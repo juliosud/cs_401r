@@ -1,0 +1,116 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Lambda dependencies (installed in lambda directories)
+aws/lambda/webhook_handler/boto3/
+aws/lambda/webhook_handler/botocore/
+aws/lambda/webhook_handler/bin/
+aws/lambda/webhook_handler/certifi/
+aws/lambda/webhook_handler/certifi-*/
+aws/lambda/webhook_handler/charset_normalizer/
+aws/lambda/webhook_handler/charset_normalizer-*/
+aws/lambda/webhook_handler/dateutil/
+aws/lambda/webhook_handler/jmespath/
+aws/lambda/webhook_handler/jmespath-*/
+aws/lambda/webhook_handler/python_dateutil-*/
+aws/lambda/webhook_handler/s3transfer/
+aws/lambda/webhook_handler/s3transfer-*/
+aws/lambda/webhook_handler/six-*/
+aws/lambda/webhook_handler/six.py
+aws/lambda/webhook_handler/urllib3/
+aws/lambda/webhook_handler/urllib3-*/
+
+aws/lambda/orchestrator/boto3/
+aws/lambda/orchestrator/botocore/
+aws/lambda/orchestrator/bin/
+aws/lambda/orchestrator/certifi/
+aws/lambda/orchestrator/certifi-*/
+aws/lambda/orchestrator/charset_normalizer/
+aws/lambda/orchestrator/charset_normalizer-*/
+aws/lambda/orchestrator/dateutil/
+aws/lambda/orchestrator/jmespath/
+aws/lambda/orchestrator/jmespath-*/
+aws/lambda/orchestrator/python_dateutil-*/
+aws/lambda/orchestrator/s3transfer/
+aws/lambda/orchestrator/s3transfer-*/
+aws/lambda/orchestrator/six-*/
+aws/lambda/orchestrator/six.py
+aws/lambda/orchestrator/urllib3/
+aws/lambda/orchestrator/urllib3-*/
+
+# Client (React TypeScript)
+client/node_modules/
+client/dist/
+client/.vite/
+
+# Deployment packages
+*.zip
+
+# Environment variables
+.env
+.env.local
+client/.env
+!client/.env.example
+
+# Backup files
+*.bak
+*.backup
+
+# Generated files
+generated/
+output/
+results.json
+messages.json
+aws/cloudformation/packaged-template.yaml
+
+# MacOS
+.DS_Store
+
+# Testing outputs
+test-output/
+htmlcov/

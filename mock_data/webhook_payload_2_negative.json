@@ -1,0 +1,28 @@
+{
+  "customer": {
+    "id": "cust_002",
+    "first_name": "Sarah",
+    "last_name": "Johnson",
+    "email": "sarah.johnson@example.com",
+    "phone": "(555) 987-6543",
+    "address": {
+      "street": "456 Elm Street",
+      "city": "Portland",
+      "state": "OR",
+      "zip": "97201"
+    }
+  },
+  "service": {
+    "type": "Termite Inspection",
+    "date": "2025-12-10",
+    "technician": "David Chen",
+    "satisfaction_score": 2,
+    "next_service": "2026-01-15",
+    "notes": "Customer reported finding termites after inspection. Rescheduled for emergency treatment."
+  },
+  "customer_lifetime_value": "high",
+  "services_count": 8,
+  "referral_eligible": false,
+  "recent_issue": "Failed to detect termite infestation during scheduled inspection"
+}
+
