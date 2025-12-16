@@ -1,0 +1,13 @@
+{
+  "event_type": "service_completed",
+  "customer": {
+    "email": "test@example.com",
+    "first_name": "John",
+    "last_name": "Smith"
+  },
+  "service": {
+    "type": "Quarterly Pest Control",
+    "satisfaction_score": 5
+  }
+}
+

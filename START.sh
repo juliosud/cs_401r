@@ -32,7 +32,7 @@ fi
 
 # Start Flask backend in background
 echo "Starting Flask backend server (port 8000)..."
-python3 server/app.py &
+python server/app.py 2>&1 &
 FLASK_PID=$!
 
 # Wait for backend to start

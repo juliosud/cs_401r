@@ -36,7 +36,7 @@ else
     USE_SAM=true
 fi
 
-if ! command -v python3 &> /dev/null; then
+if ! command -v python &> /dev/null; then
     echo "ERROR: Python 3 not found."
     exit 1
 fi
@@ -57,14 +57,28 @@ echo "=========================================="
 # Install dependencies for Webhook Handler
 echo "Installing dependencies for Webhook Handler..."
 cd "$PROJECT_ROOT/aws/lambda/webhook_handler"
-pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1
+pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1 || pip3 install -r requirements.txt -t .
 echo "✓ Webhook Handler dependencies installed"
 
 # Install dependencies for Orchestrator
 echo "Installing dependencies for Orchestrator..."
 cd "$PROJECT_ROOT/aws/lambda/orchestrator"
-pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1
+pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1 || pip3 install -r requirements.txt -t .
 echo "✓ Orchestrator dependencies installed"
+
+# Install dependencies for Feature Enricher
+echo "Installing dependencies for Feature Enricher..."
+cd "$PROJECT_ROOT/aws/lambda/feature_enricher"
+pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1 || pip3 install -r requirements.txt -t .
+echo "✓ Feature Enricher dependencies installed"
+
+# Install dependencies for Register Agent (if exists)
+if [ -f "$PROJECT_ROOT/aws/lambda/register_agent/requirements.txt" ]; then
+    echo "Installing dependencies for Register Agent..."
+    cd "$PROJECT_ROOT/aws/lambda/register_agent"
+    pip3 install -r requirements.txt -t . --upgrade >/dev/null 2>&1 || pip3 install -r requirements.txt -t .
+    echo "✓ Register Agent dependencies installed"
+fi
 
 cd "$PROJECT_ROOT"
 
@@ -185,6 +199,26 @@ echo "✓ Deployment verified"
 
 echo ""
 echo "=========================================="
+echo "Step 5: Registering Initial Agent"
+echo "=========================================="
+
+# Register initial agent in Agent Registry
+echo "Registering initial agent in Agent Registry..."
+cd "$PROJECT_ROOT"
+# Try python3 first, fallback to python (Windows compatibility)
+if command -v python3 &> /dev/null 2>&1; then
+    python3 aws/scripts/register_initial_agent.py && echo "✓ Initial agent registered" || echo "⚠ Warning: Could not register initial agent automatically."
+elif command -v python &> /dev/null 2>&1; then
+    python aws/scripts/register_initial_agent.py && echo "✓ Initial agent registered" || echo "⚠ Warning: Could not register initial agent automatically."
+else
+    echo "⚠ Warning: Python not found. Skipping initial agent registration."
+    echo "   You can register manually by running: python aws/scripts/register_initial_agent.py"
+fi
+
+cd "$PROJECT_ROOT"
+
+echo ""
+echo "=========================================="
 echo "Deployment Complete!"
 echo "=========================================="
 echo ""
@@ -205,8 +239,8 @@ echo "   aws logs tail /aws/lambda/referral-webhook-handler --follow"
 echo "   aws logs tail /aws/lambda/referral-orchestrator --follow"
 echo ""
 echo "3. Query generated messages:"
-echo "   python3 scripts/query_messages.py --list-all"
+echo "   python scripts/query_messages.py --list-all"
 echo ""
 echo "4. Run automated tests:"
-echo "   python3 scripts/test_system.py"
+echo "   python scripts/test_system.py"
 

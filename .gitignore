@@ -83,6 +83,26 @@ aws/lambda/orchestrator/six.py
 aws/lambda/orchestrator/urllib3/
 aws/lambda/orchestrator/urllib3-*/
 
+# Lambda dependencies - dist-info and egg-info
+aws/lambda/*/boto3-*.dist-info/
+aws/lambda/*/botocore-*.dist-info/
+aws/lambda/*/*.dist-info/
+aws/lambda/*/*.egg-info/
+
+# Feature Enricher Lambda dependencies
+aws/lambda/feature_enricher/boto3/
+aws/lambda/feature_enricher/botocore/
+aws/lambda/feature_enricher/bin/
+aws/lambda/feature_enricher/*.dist-info/
+aws/lambda/feature_enricher/*.egg-info/
+
+# Register Agent Lambda dependencies
+aws/lambda/register_agent/boto3/
+aws/lambda/register_agent/botocore/
+aws/lambda/register_agent/bin/
+aws/lambda/register_agent/*.dist-info/
+aws/lambda/register_agent/*.egg-info/
+
 # Client (React TypeScript)
 client/node_modules/
 client/dist/

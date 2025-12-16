@@ -56,6 +56,111 @@ def get_parameter(parameter_name: str) -> str:
     return _parameter_cache[parameter_name]
 
 
+def get_active_agent(agent_id: str = 'upsell-generator') -> Dict[str, Any]:
+    """
+    Get the active (production) agent from Agent Registry.
+    Falls back to SSM parameter if Agent Registry is empty.
+    
+    Args:
+        agent_id: Agent identifier (default: 'upsell-generator')
+        
+    Returns:
+        Dictionary with agent configuration (model_id, promptTemplate, etc.)
+    """
+    try:
+        # Get table name from SSM
+        registry_table_name = get_parameter('/referral-system/agent-registry-table-name')
+        registry_table = dynamodb.Table(registry_table_name)
+        
+        # Query for production agent
+        response = registry_table.query(
+            IndexName='StatusIndex',
+            KeyConditionExpression='#status = :status',
+            ExpressionAttributeNames={'#status': 'status'},
+            ExpressionAttributeValues={
+                ':status': 'production',
+                ':agent_id': agent_id
+            },
+            FilterExpression='agentId = :agent_id',
+            ScanIndexForward=False,  # Most recent version first
+            Limit=1
+        )
+        
+        if response['Items']:
+            agent = response['Items'][0]
+            logger.info(f"Using agent from registry: {agent_id} v{agent['version']}")
+            return {
+                'model_id': agent['bedrockModel'],
+                'version': agent['version'],
+                'promptTemplate': agent.get('promptTemplate'),
+                'config': agent.get('config', {})
+            }
+        else:
+            logger.warning(f"No production agent found in registry for {agent_id}, falling back to SSM")
+            # Fallback to SSM parameter (backward compatibility)
+            model_id = get_parameter('/referral-system/bedrock-model-id')
+            return {
+                'model_id': model_id,
+                'version': 'legacy',
+                'promptTemplate': None,
+                'config': {}
+            }
+    except Exception as e:
+        logger.warning(f"Error querying Agent Registry: {str(e)}, falling back to SSM")
+        # Fallback to SSM parameter (backward compatibility)
+        try:
+            model_id = get_parameter('/referral-system/bedrock-model-id')
+            return {
+                'model_id': model_id,
+                'version': 'legacy',
+                'promptTemplate': None,
+                'config': {}
+            }
+        except Exception as fallback_error:
+            logger.error(f"Failed to get model ID from SSM: {str(fallback_error)}")
+            raise
+
+
+def get_customer_features(customer_email: str) -> Optional[Dict[str, Any]]:
+    """
+    Get customer features from Feature Store.
+    Returns None if Feature Store is not available or customer not found.
+    
+    Args:
+        customer_email: Customer email address
+        
+    Returns:
+        Dictionary with customer features, or None if not available
+    """
+    if not customer_email:
+        return None
+    
+    try:
+        # Get table name from SSM
+        features_table_name = get_parameter('/referral-system/customer-features-table-name')
+        features_table = dynamodb.Table(features_table_name)
+        
+        # Query Feature Store
+        response = features_table.get_item(Key={'customerEmail': customer_email})
+        
+        if 'Item' in response:
+            item = response['Item']
+            logger.info(f"Retrieved features from Feature Store for {customer_email}")
+            return {
+                'satisfaction_avg': float(item.get('satisfaction_avg', 0)),
+                'service_count': int(item.get('service_count', 0)),
+                'lifetime_value': item.get('lifetime_value', 'unknown'),
+                'property_features': item.get('property_features', {})
+            }
+        else:
+            logger.info(f"No features found in Feature Store for {customer_email}")
+            return None
+    except Exception as e:
+        # Feature Store not available - backward compatible
+        logger.warning(f"Could not retrieve features from Feature Store: {str(e)}")
+        return None
+
+
 def get_brand_guidelines(bucket_name: str) -> str:
     """
     Fetch brand guidelines from S3 bucket.
@@ -107,7 +212,38 @@ def format_customer_data(customer_data: Dict[str, Any]) -> str:
     return json.dumps(customer_data, indent=2)
 
 
-def call_bedrock_generator(model_id: str, customer_data_str: str, brand_guidelines: str, retry_count: int = 0, previous_feedback: str = None) -> Dict[str, Any]:
+def format_customer_features(features: Optional[Dict[str, Any]]) -> str:
+    """
+    Format customer features for inclusion in AI prompt.
+    
+    Args:
+        features: Customer features from Feature Store, or None
+        
+    Returns:
+        Formatted string with features, or empty string if None
+    """
+    if not features:
+        return ""
+    
+    feature_text = "\n\nCUSTOMER INSIGHTS (from Feature Store):\n"
+    feature_text += f"- Average Satisfaction Score: {features.get('satisfaction_avg', 'N/A')}/5.0\n"
+    feature_text += f"- Total Services Completed: {features.get('service_count', 0)}\n"
+    feature_text += f"- Customer Lifetime Value: {features.get('lifetime_value', 'unknown').upper()}\n"
+    
+    property_features = features.get('property_features', {})
+    if property_features:
+        feature_text += f"- Property Location: {property_features.get('city', 'N/A')}, {property_features.get('state', 'N/A')}\n"
+        if property_features.get('property_type'):
+            feature_text += f"- Property Type: {property_features.get('property_type')}\n"
+        if property_features.get('square_feet'):
+            feature_text += f"- Property Size: {property_features.get('square_feet')} sq ft\n"
+    
+    feature_text += "\nUse these insights to personalize the message and select the most relevant service."
+    
+    return feature_text
+
+
+def call_bedrock_generator(model_id: str, customer_data_str: str, brand_guidelines: str, retry_count: int = 0, previous_feedback: str = None, customer_features: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Call Bedrock LLM to generate service upsell message.
     
@@ -117,6 +253,7 @@ def call_bedrock_generator(model_id: str, customer_data_str: str, brand_guidelin
         brand_guidelines: Brand guidelines text (includes service catalog)
         retry_count: Current retry attempt
         previous_feedback: Feedback from previous rejection (if any)
+        customer_features: Customer features from Feature Store (optional)
         
     Returns:
         Dictionary with generated message content and metadata
@@ -125,13 +262,19 @@ def call_bedrock_generator(model_id: str, customer_data_str: str, brand_guidelin
     if retry_count > 0 and previous_feedback:
         feedback_note = f"\n\nIMPORTANT - Previous attempt was rejected:\n{previous_feedback}\nPlease address these issues and select a different service if needed."
 
+    # Format features for prompt
+    features_text = format_customer_features(customer_features)
+
+    # Format features for prompt
+    features_text = format_customer_features(customer_features)
+
     prompt = f"""You are creating a personalized service upsell message for a pest control customer.
 
 Customer Data (JSON):
 {customer_data_str}
 
 Company Information & Service Catalog (JSON):
-{brand_guidelines}
+{brand_guidelines}{features_text}
 
 Your task:
 1. Analyze the customer data provided (it may have various fields - use what's available)
@@ -448,15 +591,28 @@ def process_message(message_body: Dict[str, Any]) -> Dict[str, Any]:
     
     # Try to get customer identifier for logging
     customer_id = customer.get('email') or customer.get('id') or 'unknown'
+    customer_email = customer.get('email') or 'unknown@example.com'
     logger.info(f"Processing upsell message for customer: {customer_id}")
     
     # Get configuration
     bucket_name = get_parameter('/referral-system/s3-bucket-name')
-    model_id = get_parameter('/referral-system/bedrock-model-id')
     table_name = get_parameter('/referral-system/dynamodb-table-name')
+    
+    # Get active agent from Agent Registry (with fallback to SSM)
+    active_agent = get_active_agent('upsell-generator')
+    model_id = active_agent['model_id']
+    agent_version = active_agent['version']
+    logger.info(f"Using agent version: {agent_version}, model: {model_id}")
     
     # Fetch brand guidelines
     brand_guidelines = get_brand_guidelines(bucket_name)
+    
+    # Query Feature Store for customer features
+    customer_features = get_customer_features(customer_email)
+    if customer_features:
+        logger.info(f"Using features from Feature Store: satisfaction={customer_features.get('satisfaction_avg')}, services={customer_features.get('service_count')}, LTV={customer_features.get('lifetime_value')}")
+    else:
+        logger.info("No features found in Feature Store - proceeding without features")
     
     # Format customer data
     customer_data_str = format_customer_data(webhook_payload)
@@ -476,7 +632,8 @@ def process_message(message_body: Dict[str, Any]) -> Dict[str, Any]:
             customer_data_str=customer_data_str,
             brand_guidelines=brand_guidelines,
             retry_count=retry_count,
-            previous_feedback=previous_feedback
+            previous_feedback=previous_feedback,
+            customer_features=customer_features
         )
         
         # Judge email
@@ -536,6 +693,7 @@ def process_message(message_body: Dict[str, Any]) -> Dict[str, Any]:
         'createdAt': datetime.utcnow().isoformat(),
         'status': 'approved' if approved else 'rejected',
         'retryCount': retry_count,
+        'agentVersion': agent_version,  # Track which agent version generated this
         'customerData': webhook_payload
     }
     

@@ -96,6 +96,57 @@ Resources:
         - Key: Project
           Value: ReferralEmailSystem
 
+  # DynamoDB Table for Agent Registry
+  AgentRegistryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AgentRegistry
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: agentId
+          AttributeType: S
+        - AttributeName: version
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: agentId
+          KeyType: HASH
+        - AttributeName: version
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: version
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # Feature Store: Customer Features Table
+  CustomerFeaturesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CustomerFeatures
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: customerEmail
+          AttributeType: S
+      KeySchema:
+        - AttributeName: customerEmail
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
   # IAM Role for Webhook Handler Lambda
   WebhookHandlerRole:
     Type: AWS::IAM::Role
@@ -181,8 +232,94 @@ Resources:
                   - !Sub '${ReferralMessagesTable.Arn}/index/*'
               - Effect: Allow
                 Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt AgentRegistryTable.Arn
+                  - !Sub '${AgentRegistryTable.Arn}/index/*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt CustomerFeaturesTable.Arn
+                  - !Sub '${CustomerFeaturesTable.Arn}/index/*'
+              - Effect: Allow
+                Action:
                   - cloudwatch:PutMetricData
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/referral-system/*'
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # IAM Role for Feature Enricher Lambda
+  FeatureEnricherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: referral-feature-enricher-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: FeatureEnricherPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !GetAtt CustomerFeaturesTable.Arn
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/referral-system/*'
+      Tags:
+        - Key: Project
+          Value: ReferralEmailSystem
+
+  # IAM Role for Register Agent Lambda
+  RegisterAgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: referral-register-agent-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RegisterAgentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt AgentRegistryTable.Arn
+                  - !Sub '${AgentRegistryTable.Arn}/index/*'
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
@@ -231,6 +368,40 @@ Resources:
             Queue: !GetAtt ReferralQueue.Arn
             BatchSize: 1
             MaximumBatchingWindowInSeconds: 0
+      Tags:
+        Project: ReferralEmailSystem
+
+  # Feature Enricher Lambda Function
+  FeatureEnricherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: referral-feature-enricher
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../lambda/feature_enricher/
+      MemorySize: 256
+      Timeout: 60
+      Role: !GetAtt FeatureEnricherRole.Arn
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Tags:
+        Project: ReferralEmailSystem
+
+  # Register Agent Lambda Function
+  RegisterAgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: referral-register-agent
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      CodeUri: ../lambda/register_agent/
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt RegisterAgentRole.Arn
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
       Tags:
         Project: ReferralEmailSystem
 
@@ -361,6 +532,23 @@ Resources:
       Tags:
         Project: ReferralEmailSystem
 
+  AgentRegistryTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/agent-registry-table-name
+      Type: String
+      Value: !Ref AgentRegistryTable
+
+  CustomerFeaturesTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /referral-system/customer-features-table-name
+      Type: String
+      Value: !Ref CustomerFeaturesTable
+      Description: DynamoDB table name for Customer Features (Feature Store)
+      Tags:
+        Project: ReferralEmailSystem
+
   # CloudWatch Log Groups
   WebhookHandlerLogGroup:
     Type: AWS::Logs::LogGroup
@@ -372,6 +560,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/lambda/referral-orchestrator
+      RetentionInDays: 7
+
+  RegisterAgentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/referral-register-agent
       RetentionInDays: 7
 
 Outputs:
@@ -410,6 +604,24 @@ Outputs:
     Value: !Ref ReferralMessagesTable
     Export:
       Name: ReferralDynamoDBTable
+
+  AgentRegistryTableName:
+    Description: Agent Registry DynamoDB table name
+    Value: !Ref AgentRegistryTable
+    Export:
+      Name: ReferralAgentRegistryTable
+
+  CustomerFeaturesTableName:
+    Description: Customer Features (Feature Store) DynamoDB table name
+    Value: !Ref CustomerFeaturesTable
+    Export:
+      Name: ReferralCustomerFeaturesTable
+
+  FeatureEnricherFunctionArn:
+    Description: Feature Enricher Lambda function ARN
+    Value: !GetAtt FeatureEnricherFunction.Arn
+    Export:
+      Name: ReferralFeatureEnricherFunctionArn
 
   WebhookHandlerFunctionArn:
     Description: Webhook handler Lambda ARN
