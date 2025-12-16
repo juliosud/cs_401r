@@ -21,29 +21,46 @@ sqs_client = boto3.client('sqs')
 # Cache for SSM parameters
 _parameter_cache = {}
 
+# Get environment from Lambda environment variable
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
+
 def get_parameter(parameter_name: str) -> str:
     """
     Retrieve parameter from SSM Parameter Store with caching.
+    Supports environment-specific parameters with backward compatibility.
     
     Args:
-        parameter_name: Name of the SSM parameter
+        parameter_name: Name of the SSM parameter (base name, will try env-specific first)
         
     Returns:
         Parameter value as string
     """
-    if parameter_name not in _parameter_cache:
+    # Construct environment-specific parameter name
+    if parameter_name.startswith('/referral-system/'):
+        env_specific_name = parameter_name.replace('/referral-system/', f'/referral-system/{ENVIRONMENT}/')
+    else:
+        env_specific_name = parameter_name
+    
+    # Try environment-specific parameter first, then fallback to old path
+    for param_name in [env_specific_name, parameter_name]:
+        if param_name in _parameter_cache:
+            return _parameter_cache[param_name]
+        
         try:
             response = ssm_client.get_parameter(
-                Name=parameter_name,
+                Name=param_name,
                 WithDecryption=True
             )
-            _parameter_cache[parameter_name] = response['Parameter']['Value']
-            logger.info(f"Retrieved parameter: {parameter_name}")
+            _parameter_cache[param_name] = response['Parameter']['Value']
+            logger.info(f"Retrieved parameter: {param_name}")
+            return _parameter_cache[param_name]
+        except ssm_client.exceptions.ParameterNotFound:
+            continue
         except Exception as e:
-            logger.error(f"Error retrieving parameter {parameter_name}: {str(e)}")
+            logger.error(f"Error retrieving parameter {param_name}: {str(e)}")
             raise
     
-    return _parameter_cache[parameter_name]
+    raise ValueError(f"Parameter not found: {parameter_name} or {env_specific_name}")
 
 
 def validate_webhook_payload(payload: Dict[str, Any]) -> tuple[bool, str]:

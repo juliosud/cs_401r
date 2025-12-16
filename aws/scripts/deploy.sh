@@ -11,8 +11,33 @@ echo "=========================================="
 
 # Configuration
 AWS_REGION=${AWS_REGION:-us-east-1}
-STACK_NAME="referral-email-system"
 PROJECT_ROOT=$(pwd)
+
+# Parse command line arguments
+ACCOUNT="dev"  # Default to dev
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --account)
+            ACCOUNT="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--account dev|test|prod]"
+            exit 1
+            ;;
+    esac
+done
+
+# Validate account
+if [[ ! "$ACCOUNT" =~ ^(dev|test|prod)$ ]]; then
+    echo "ERROR: Account must be dev, test, or prod"
+    exit 1
+fi
+
+# Set stack name based on account
+STACK_NAME="referral-email-system-${ACCOUNT}"
 
 echo "AWS Region: $AWS_REGION"
 echo "Stack Name: $STACK_NAME"
@@ -100,7 +125,8 @@ if [ "$USE_SAM" = true ]; then
         --capabilities CAPABILITY_NAMED_IAM \
         --resolve-s3 \
         --no-confirm-changeset \
-        --no-fail-on-empty-changeset
+        --no-fail-on-empty-changeset \
+        --parameter-overrides Environment=$ACCOUNT
     
     cd "$PROJECT_ROOT"
 else
@@ -143,7 +169,8 @@ else
             --stack-name $STACK_NAME \
             --region $AWS_REGION \
             --template-body file://aws/cloudformation/packaged-template.yaml \
-            --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
+            --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --parameters ParameterKey=Environment,ParameterValue=$ACCOUNT
         
         echo "Waiting for stack creation to complete..."
         aws cloudformation wait stack-create-complete \

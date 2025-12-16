@@ -14,7 +14,9 @@ cloudformation = boto3.client('cloudformation')
 dynamodb = boto3.resource('dynamodb')
 ssm = boto3.client('ssm')
 
-STACK_NAME = 'referral-email-system'
+# Get environment from command line or default to dev
+ENVIRONMENT = sys.argv[1] if len(sys.argv) > 1 else 'dev'
+STACK_NAME = f'referral-email-system-{ENVIRONMENT}'
 
 
 def get_table_name() -> str:
@@ -25,9 +27,17 @@ def get_table_name() -> str:
         for output in outputs:
             if output['OutputKey'] == 'AgentRegistryTableName':
                 return output['OutputValue']
-        # Fallback to SSM
-        response = ssm.get_parameter(Name='/referral-system/agent-registry-table-name')
-        return response['Parameter']['Value']
+        # Fallback to SSM (try environment-specific first)
+        try:
+            response = ssm.get_parameter(Name=f'/referral-system/{ENVIRONMENT}/agent-registry-table-name')
+            return response['Parameter']['Value']
+        except:
+            # Fallback to old path for backward compatibility
+            try:
+                response = ssm.get_parameter(Name='/referral-system/agent-registry-table-name')
+                return response['Parameter']['Value']
+            except:
+                return 'AgentRegistry'  # Final fallback
     except Exception as e:
         print(f"Error: Failed to get table name: {str(e)}", file=sys.stderr)
         return 'AgentRegistry'  # Fallback
@@ -36,8 +46,14 @@ def get_table_name() -> str:
 def get_default_model_id() -> str:
     """Get default Bedrock model ID from SSM."""
     try:
-        response = ssm.get_parameter(Name='/referral-system/bedrock-model-id')
-        return response['Parameter']['Value']
+        # Try environment-specific first
+        try:
+            response = ssm.get_parameter(Name=f'/referral-system/{ENVIRONMENT}/bedrock-model-id')
+            return response['Parameter']['Value']
+        except:
+            # Fallback to old path
+            response = ssm.get_parameter(Name='/referral-system/bedrock-model-id')
+            return response['Parameter']['Value']
     except Exception:
         return 'amazon.nova-pro-v1:0'  # Default fallback
 
@@ -89,9 +105,9 @@ def register_initial_agent():
 
 
 if __name__ == '__main__':
-    print("Registering initial agent in Agent Registry...")
+    print(f"Registering initial agent in Agent Registry (Environment: {ENVIRONMENT})...")
     register_initial_agent()
-    print("\n[OK] Agent Registry setup complete!")
+    print(f"\n[OK] Agent Registry setup complete for {ENVIRONMENT} environment!")
     print("\nThe orchestrator will now use this agent from the registry.")
     print("You can register new versions using the register_agent Lambda function.")
 

@@ -7,13 +7,22 @@ Parameters:
     Type: String
     Default: 'amazon.nova-pro-v1:0'
     Description: Bedrock model identifier for LLM (Amazon Nova Pro)
+  
+  Environment:
+    Type: String
+    Default: 'dev'
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: Deployment environment (dev/test/prod)
 
 Resources:
   # S3 Bucket for Brand Guidelines
   BrandGuidelinesBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'referral-brand-guidelines-${AWS::AccountId}'
+      BucketName: !Sub 'referral-brand-guidelines-${Environment}-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -33,7 +42,7 @@ Resources:
   ReferralQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: referral-queue
+      QueueName: !Sub 'referral-queue-${Environment}'
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600  # 14 days
       RedrivePolicy:
@@ -47,7 +56,7 @@ Resources:
   ReferralDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: referral-dlq
+      QueueName: !Sub 'referral-dlq-${Environment}'
       MessageRetentionPeriod: 1209600  # 14 days
       Tags:
         - Key: Project
@@ -57,7 +66,7 @@ Resources:
   ReferralMessagesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ReferralMessages
+      TableName: !Sub 'ReferralMessages${Environment}'
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -100,7 +109,7 @@ Resources:
   AgentRegistryTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: AgentRegistry
+      TableName: !Sub 'AgentRegistry${Environment}'
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -133,7 +142,7 @@ Resources:
   CustomerFeaturesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: CustomerFeatures
+      TableName: !Sub 'CustomerFeatures${Environment}'
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -151,7 +160,7 @@ Resources:
   WebhookHandlerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: referral-webhook-handler-role
+      RoleName: !Sub 'referral-webhook-handler-role-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -184,7 +193,7 @@ Resources:
   OrchestratorRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: referral-orchestrator-role
+      RoleName: !Sub 'referral-orchestrator-role-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -261,7 +270,7 @@ Resources:
   FeatureEnricherRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: referral-feature-enricher-role
+      RoleName: !Sub 'referral-feature-enricher-role-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -296,7 +305,7 @@ Resources:
   RegisterAgentRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: referral-register-agent-role
+      RoleName: !Sub 'referral-register-agent-role-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -333,7 +342,7 @@ Resources:
   WebhookHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: referral-webhook-handler
+      FunctionName: !Sub 'referral-webhook-handler-${Environment}'
       Runtime: python3.11
       Handler: lambda_function.lambda_handler
       CodeUri: ../lambda/webhook_handler/
@@ -343,6 +352,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
       Tags:
         Project: ReferralEmailSystem
 
@@ -350,7 +360,7 @@ Resources:
   OrchestratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: referral-orchestrator
+      FunctionName: !Sub 'referral-orchestrator-${Environment}'
       Runtime: python3.11
       Handler: lambda_function.lambda_handler
       CodeUri: ../lambda/orchestrator/
@@ -361,6 +371,7 @@ Resources:
         Variables:
           LOG_LEVEL: INFO
           MODEL_API: CONVERSE
+          ENVIRONMENT: !Ref Environment
       Events:
         SQSEvent:
           Type: SQS
@@ -375,7 +386,7 @@ Resources:
   FeatureEnricherFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: referral-feature-enricher
+      FunctionName: !Sub 'referral-feature-enricher-${Environment}'
       Runtime: python3.11
       Handler: lambda_function.lambda_handler
       CodeUri: ../lambda/feature_enricher/
@@ -385,6 +396,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
       Tags:
         Project: ReferralEmailSystem
 
@@ -392,7 +404,7 @@ Resources:
   RegisterAgentFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: referral-register-agent
+      FunctionName: !Sub 'referral-register-agent-${Environment}'
       Runtime: python3.11
       Handler: lambda_function.lambda_handler
       CodeUri: ../lambda/register_agent/
@@ -402,6 +414,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
       Tags:
         Project: ReferralEmailSystem
 
@@ -495,7 +508,7 @@ Resources:
   SQSQueueUrlParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/sqs-queue-url
+      Name: !Sub '/referral-system/${Environment}/sqs-queue-url'
       Type: String
       Value: !Ref ReferralQueue
       Description: SQS Queue URL for referral system
@@ -505,7 +518,7 @@ Resources:
   S3BucketNameParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/s3-bucket-name
+      Name: !Sub '/referral-system/${Environment}/s3-bucket-name'
       Type: String
       Value: !Ref BrandGuidelinesBucket
       Description: S3 Bucket name for brand guidelines
@@ -515,7 +528,7 @@ Resources:
   BedrockModelIdParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/bedrock-model-id
+      Name: !Sub '/referral-system/${Environment}/bedrock-model-id'
       Type: String
       Value: !Ref BedrockModelId
       Description: Bedrock model ID for LLM
@@ -525,7 +538,7 @@ Resources:
   DynamoDBTableNameParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/dynamodb-table-name
+      Name: !Sub '/referral-system/${Environment}/dynamodb-table-name'
       Type: String
       Value: !Ref ReferralMessagesTable
       Description: DynamoDB table name for messages
@@ -535,14 +548,14 @@ Resources:
   AgentRegistryTableNameParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/agent-registry-table-name
+      Name: !Sub '/referral-system/${Environment}/agent-registry-table-name'
       Type: String
       Value: !Ref AgentRegistryTable
 
   CustomerFeaturesTableNameParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /referral-system/customer-features-table-name
+      Name: !Sub '/referral-system/${Environment}/customer-features-table-name'
       Type: String
       Value: !Ref CustomerFeaturesTable
       Description: DynamoDB table name for Customer Features (Feature Store)
@@ -553,19 +566,19 @@ Resources:
   WebhookHandlerLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/referral-webhook-handler
+      LogGroupName: !Sub '/aws/lambda/referral-webhook-handler-${Environment}'
       RetentionInDays: 7
 
   OrchestratorLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/referral-orchestrator
+      LogGroupName: !Sub '/aws/lambda/referral-orchestrator-${Environment}'
       RetentionInDays: 7
 
   RegisterAgentLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/referral-register-agent
+      LogGroupName: !Sub '/aws/lambda/referral-register-agent-${Environment}'
       RetentionInDays: 7
 
 Outputs:
@@ -573,65 +586,65 @@ Outputs:
     Description: API Gateway endpoint URL
     Value: !Sub 'https://${ReferralApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
     Export:
-      Name: ReferralApiEndpoint
+      Name: !Sub 'ReferralApiEndpoint-${Environment}'
 
   WebhookUrl:
     Description: Webhook endpoint URL
     Value: !Sub 'https://${ReferralApi}.execute-api.${AWS::Region}.amazonaws.com/prod/webhook'
     Export:
-      Name: ReferralWebhookUrl
+      Name: !Sub 'ReferralWebhookUrl-${Environment}'
 
   BrandGuidelinesBucket:
     Description: S3 bucket name for brand guidelines
     Value: !Ref BrandGuidelinesBucket
     Export:
-      Name: ReferralBrandGuidelinesBucket
+      Name: !Sub 'ReferralBrandGuidelinesBucket-${Environment}'
 
   ReferralQueueUrl:
     Description: SQS queue URL
     Value: !Ref ReferralQueue
     Export:
-      Name: ReferralQueueUrl
+      Name: !Sub 'ReferralQueueUrl-${Environment}'
 
   DeadLetterQueueUrl:
     Description: Dead letter queue URL
     Value: !Ref ReferralDeadLetterQueue
     Export:
-      Name: ReferralDeadLetterQueueUrl
+      Name: !Sub 'ReferralDeadLetterQueueUrl-${Environment}'
 
   DynamoDBTableName:
     Description: DynamoDB table name
     Value: !Ref ReferralMessagesTable
     Export:
-      Name: ReferralDynamoDBTable
+      Name: !Sub 'ReferralDynamoDBTable-${Environment}'
 
   AgentRegistryTableName:
     Description: Agent Registry DynamoDB table name
     Value: !Ref AgentRegistryTable
     Export:
-      Name: ReferralAgentRegistryTable
+      Name: !Sub 'ReferralAgentRegistryTable-${Environment}'
 
   CustomerFeaturesTableName:
     Description: Customer Features (Feature Store) DynamoDB table name
     Value: !Ref CustomerFeaturesTable
     Export:
-      Name: ReferralCustomerFeaturesTable
+      Name: !Sub 'ReferralCustomerFeaturesTable-${Environment}'
 
   FeatureEnricherFunctionArn:
     Description: Feature Enricher Lambda function ARN
     Value: !GetAtt FeatureEnricherFunction.Arn
     Export:
-      Name: ReferralFeatureEnricherFunctionArn
+      Name: !Sub 'ReferralFeatureEnricherFunctionArn-${Environment}'
 
   WebhookHandlerFunctionArn:
     Description: Webhook handler Lambda ARN
     Value: !GetAtt WebhookHandlerFunction.Arn
     Export:
-      Name: WebhookHandlerFunctionArn
+      Name: !Sub 'WebhookHandlerFunctionArn-${Environment}'
 
   OrchestratorFunctionArn:
     Description: Orchestrator Lambda ARN
     Value: !GetAtt OrchestratorFunction.Arn
     Export:
-      Name: OrchestratorFunctionArn
+      Name: !Sub 'OrchestratorFunctionArn-${Environment}'
 

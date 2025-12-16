@@ -13,11 +13,19 @@ if [ ! -f "START.sh" ]; then
 fi
 
 # Auto-configure webhook URL if .env doesn't exist
+# Check for environment parameter or default to production
+ENV=${1:-prod}
+if [ "$ENV" != "prod" ]; then
+    STACK_NAME="referral-email-system-${ENV}"
+else
+    STACK_NAME="referral-email-system"
+fi
+
 if [ ! -f "client/.env" ]; then
-    echo "Configuring webhook URL from AWS..."
+    echo "Configuring webhook URL from AWS (Environment: $ENV)..."
     WEBHOOK_URL=$(aws cloudformation describe-stacks \
-        --stack-name referral-email-system \
-        --query 'Stacks[0].Outputs[?OutputKey==`WebhookURL`].OutputValue' \
+        --stack-name "$STACK_NAME" \
+        --query 'Stacks[0].Outputs[?OutputKey==`WebhookUrl`].OutputValue' \
         --output text \
         --region us-east-1 2>/dev/null)
     
