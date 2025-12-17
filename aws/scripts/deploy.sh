@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate account
+# Validate account (nOTE: sHOW THIS)
 if [[ ! "$ACCOUNT" =~ ^(dev|test|prod)$ ]]; then
     echo "ERROR: Account must be dev, test, or prod"
     exit 1
